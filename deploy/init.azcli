@@ -1,0 +1,13 @@
+resourceGroupName="rg-demo-ui"
+
+az group create --name $resourceGroupName --location francecentral
+
+az deployment sub create `
+    --template-file azure.sub.deploy.json `
+    --location francecentral `
+    --parameters awsSecretKey=123 awsAccessKey=123 awsBucket=mydevdata project=blobtos3
+
+# az webapp config appsetting set 
+#     --name dev-niant-func \
+#     --resource-group $resourceGroupName \
+#     --settings AZURE_TENANT_ID=$tenantId AZURE_SUBSCRIPTION_ID=$subscriptionId

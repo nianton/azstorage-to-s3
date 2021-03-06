@@ -1,0 +1,16 @@
+{
+  // Copy file as local.settings.json and replace placeholder values for local development
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "DataStorageConnection": "UseDevelopmentStorage=true",
+    "LiveContainer": "livedata",
+    "ArchiveContainer": "archive",
+    "ScheduledContainer": "scheduled",
+    "AwsAccessKey": "ACCESS_KEY",
+    "AwsSecretKey": "SECRET_KEY",
+    "AwsBucketName": "BUCKET_NAME",
+    "AwsRegion": "eu-central-1"
+  }
+}
