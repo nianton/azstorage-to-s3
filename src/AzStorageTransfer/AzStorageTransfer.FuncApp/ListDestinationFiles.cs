@@ -5,6 +5,7 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace AzStorageTransfer.FuncApp
@@ -28,7 +29,13 @@ namespace AzStorageTransfer.FuncApp
             try
             {
                 var response = await amazonS3.ListObjectsAsync(Config.Aws.BucketName);
-                var objects = response.S3Objects;
+                var objects = response.S3Objects.Select(so => new
+                {
+                    so.BucketName,
+                    so.Size,
+                    so.Key,
+                    so.LastModified
+                });
 
                 return new OkObjectResult(objects);
             }
