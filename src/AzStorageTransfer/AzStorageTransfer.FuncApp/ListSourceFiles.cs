@@ -30,8 +30,16 @@ namespace AzStorageTransfer.FuncApp
             try
             {
                 var blobs = this.cloudBlobClient.GetContainerReference(Config.ScheduledContainer).ListBlobs();
-                var blobList = blobs.ToList();
-                return new OkObjectResult(blobList);
+                var blobList = blobs.OfType<CloudBlockBlob>().ToList();
+                var dataTransferObjs = blobList.Select(b => new { 
+                    b.Name, 
+                    b.Properties, 
+                    b.Uri, 
+                    b.Metadata, 
+                    Container = b.Container.Name 
+                });
+
+                return new OkObjectResult(dataTransferObjs);
             }
             catch (Exception ex)
             {

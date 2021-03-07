@@ -4,6 +4,7 @@ param tags object = {}
 param funcWorkerRuntime string = 'dotnet'
 param funcExtensionVersion string = '~3'
 param funcAppSettings array = []
+param managedIdentity bool = false
 
 @allowed([
   'Y1'
@@ -58,6 +59,9 @@ resource funcApp 'Microsoft.Web/sites@2020-06-01' = {
   name: name
   location: location
   kind: 'functionapp'
+  identity: {
+    type: managedIdentity ? 'SystemAssigned' : 'None'
+  }
   properties: {
     serverFarmId: funcAppServicePlan.id
     siteConfig: {
@@ -94,6 +98,10 @@ resource funcApp 'Microsoft.Web/sites@2020-06-01' = {
           name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
           value: funcAppIns.outputs.instrumentationKey
         }
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: 'InstrumentationKey=${funcAppIns.outputs.instrumentationKey}'
+        }
       ], funcAppSettings)
     }
     httpsOnly: true
@@ -110,10 +118,11 @@ resource networkConfig 'Microsoft.Web/sites/networkConfig@2020-06-01' = if (crea
 }
 
 resource funcAppSourceControl 'Microsoft.Web/sites/sourcecontrols@2020-06-01' = if (createSourceControl) {
-  name: '${funcApp.name}/funcAppSourceControl'
+  name: '${funcApp.name}/web'
   properties: {
     branch: funcDeployBranch
     repoUrl: funcDeployRepoUrl
+    isManualIntegration: true
   }
 }
 
@@ -148,5 +157,10 @@ resource sampleFunction 'Microsoft.Web/sites/functions@2020-06-01' = if (include
 output id string = funcApp.id
 output name string = funcApp.name
 output appServicePlanId string = funcAppServicePlan.id
-output appIns object = funcAppIns
+output identity object = {
+  tenantId: funcApp.identity.tenantId
+  principalId: funcApp.identity.principalId
+  type: funcApp.identity.type
+}
+output applicationInsights object = funcAppIns
 output storage object = funcStorage

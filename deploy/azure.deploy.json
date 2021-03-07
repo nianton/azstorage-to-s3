@@ -26,6 +26,10 @@
       "type": "string",
       "defaultValue": "live"
     },
+    "keyVaultSku": {
+      "type": "string",
+      "defaultValue": "Standard"
+    },
     "awsBucket": {
       "type": "string",
       "metadata": {
@@ -50,7 +54,13 @@
     "resourcePrefix": "[format('{0}-{1}', parameters('project'), parameters('environment'))]",
     "resourceNames": {
       "funcApp": "[format('{0}-func', variables('resourcePrefix'))]",
+      "keyVault": "[format('{0}-kv', variables('resourcePrefix'))]",
       "dataStorage": "[format('s{0}data', toLower(replace(variables('resourcePrefix'), '-', '')))]"
+    },
+    "secretNames": {
+      "awsSecretKey": "awsSecretKey",
+      "awsAccessKey": "awsAccessKey",
+      "dataStorageConnectionString": "[format('{0}ConnectionString', variables('resourceNames').dataStorage)]"
     },
     "defaultTags": {
       "environment": "[parameters('environment')]",
@@ -73,6 +83,68 @@
       "name": "[format('{0}/default/{1}', variables('resourceNames').dataStorage, variables('containerNames')[copyIndex()])]",
       "dependsOn": [
         "[resourceId('Microsoft.Resources/deployments', 'dataStorage')]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2019-09-01",
+      "name": "[variables('resourceNames').keyVault]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "tenantId": "[subscription().tenantId]",
+        "sku": {
+          "family": "A",
+          "name": "[parameters('keyVaultSku')]"
+        },
+        "accessPolicies": [
+          {
+            "tenantId": "[reference(resourceId('Microsoft.Resources/deployments', 'funcApp'), '2019-10-01').outputs.identity.value.tenantId]",
+            "objectId": "[reference(resourceId('Microsoft.Resources/deployments', 'funcApp'), '2019-10-01').outputs.identity.value.principalId]",
+            "permissions": {
+              "secrets": [
+                "get"
+              ]
+            }
+          }
+        ]
+      },
+      "tags": "[variables('defaultTags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'funcApp')]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2018-02-14",
+      "name": "[format('{0}/{1}', variables('resourceNames').keyVault, variables('secretNames').dataStorageConnectionString)]",
+      "properties": {
+        "value": "[reference(resourceId('Microsoft.Resources/deployments', 'dataStorage'), '2019-10-01').outputs.connectionString.value]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'dataStorage')]",
+        "[resourceId('Microsoft.KeyVault/vaults', variables('resourceNames').keyVault)]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2018-02-14",
+      "name": "[format('{0}/{1}', variables('resourceNames').keyVault, variables('secretNames').awsAccessKey)]",
+      "properties": {
+        "value": "[parameters('awsAccessKey')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('resourceNames').keyVault)]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2018-02-14",
+      "name": "[format('{0}/{1}', variables('resourceNames').keyVault, variables('secretNames').awsSecretKey)]",
+      "properties": {
+        "value": "[parameters('awsSecretKey')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('resourceNames').keyVault)]"
       ]
     },
     {
@@ -174,37 +246,46 @@
           "name": {
             "value": "[variables('resourceNames').funcApp]"
           },
+          "managedIdentity": {
+            "value": true
+          },
           "tags": {
             "value": "[variables('defaultTags')]"
+          },
+          "funcDeployBranch": {
+            "value": "main"
+          },
+          "funcDeployRepoUrl": {
+            "value": "https://github.com/nianton/azstorage-to-s3"
           },
           "funcAppSettings": {
             "value": [
               {
                 "name": "DataStorageConnection",
-                "value": "[reference(resourceId('Microsoft.Resources/deployments', 'dataStorage'), '2019-10-01').outputs.connectionString.value]"
+                "value": "[format('@Microsoft.KeyVault(VaultName={0};SecretName={1})', variables('resourceNames').keyVault, variables('secretNames').dataStorageConnectionString)]"
               },
               {
                 "name": "AwsAccessKey",
-                "value": "[parameters('awsAccessKey')]"
+                "value": "[format('@Microsoft.KeyVault(VaultName={0};SecretName={1})', variables('resourceNames').keyVault, variables('secretNames').awsAccessKey)]"
               },
               {
                 "name": "AwsSecretKey",
-                "value": "[parameters('awsSecretKey')]"
+                "value": "[format('@Microsoft.KeyVault(VaultName={0};SecretName={1})', variables('resourceNames').keyVault, variables('secretNames').awsSecretKey)]"
               },
               {
-                "name": "AwsBucket",
+                "name": "AwsBucketName",
                 "value": "[parameters('awsBucket')]"
               },
               {
-                "name": "LiveContainerName",
+                "name": "LiveContainer",
                 "value": "[parameters('liveContainerName')]"
               },
               {
-                "name": "ScheduledContainerName",
+                "name": "ScheduledContainer",
                 "value": "[parameters('scheduledContainerName')]"
               },
               {
-                "name": "ArchiveContainerName",
+                "name": "ArchiveContainer",
                 "value": "[parameters('archiveContainerName')]"
               }
             ]
@@ -236,6 +317,10 @@
             "funcAppSettings": {
               "type": "array",
               "defaultValue": []
+            },
+            "managedIdentity": {
+              "type": "bool",
+              "defaultValue": false
             },
             "skuName": {
               "type": "string",
@@ -291,10 +376,13 @@
               "name": "[parameters('name')]",
               "location": "[parameters('location')]",
               "kind": "functionapp",
+              "identity": {
+                "type": "[if(parameters('managedIdentity'), 'SystemAssigned', 'None')]"
+              },
               "properties": {
                 "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('funcAppServicePlanName'))]",
                 "siteConfig": {
-                  "appSettings": "[concat(createArray(createObject('name', 'FUNCTIONS_EXTENSION_VERSION', 'value', parameters('funcExtensionVersion')), createObject('name', 'WEBSITE_NODE_DEFAULT_VERSION', 'value', '10.14.1'), createObject('name', 'FUNCTIONS_WORKER_RUNTIME', 'value', parameters('funcWorkerRuntime')), createObject('name', 'AzureWebJobsDashboard', 'value', reference(resourceId('Microsoft.Resources/deployments', variables('funcStorageName')), '2019-10-01').outputs.connectionString.value), createObject('name', 'AzureWebJobsStorage', 'value', reference(resourceId('Microsoft.Resources/deployments', variables('funcStorageName')), '2019-10-01').outputs.connectionString.value), createObject('name', 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING', 'value', reference(resourceId('Microsoft.Resources/deployments', variables('funcStorageName')), '2019-10-01').outputs.connectionString.value), createObject('name', 'WEBSITE_CONTENTSHARE', 'value', toLower(parameters('name'))), createObject('name', 'APPINSIGHTS_INSTRUMENTATIONKEY', 'value', reference(resourceId('Microsoft.Resources/deployments', variables('funcAppInsName')), '2019-10-01').outputs.instrumentationKey.value)), parameters('funcAppSettings'))]"
+                  "appSettings": "[concat(createArray(createObject('name', 'FUNCTIONS_EXTENSION_VERSION', 'value', parameters('funcExtensionVersion')), createObject('name', 'WEBSITE_NODE_DEFAULT_VERSION', 'value', '10.14.1'), createObject('name', 'FUNCTIONS_WORKER_RUNTIME', 'value', parameters('funcWorkerRuntime')), createObject('name', 'AzureWebJobsDashboard', 'value', reference(resourceId('Microsoft.Resources/deployments', variables('funcStorageName')), '2019-10-01').outputs.connectionString.value), createObject('name', 'AzureWebJobsStorage', 'value', reference(resourceId('Microsoft.Resources/deployments', variables('funcStorageName')), '2019-10-01').outputs.connectionString.value), createObject('name', 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING', 'value', reference(resourceId('Microsoft.Resources/deployments', variables('funcStorageName')), '2019-10-01').outputs.connectionString.value), createObject('name', 'WEBSITE_CONTENTSHARE', 'value', toLower(parameters('name'))), createObject('name', 'APPINSIGHTS_INSTRUMENTATIONKEY', 'value', reference(resourceId('Microsoft.Resources/deployments', variables('funcAppInsName')), '2019-10-01').outputs.instrumentationKey.value), createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', format('InstrumentationKey={0}', reference(resourceId('Microsoft.Resources/deployments', variables('funcAppInsName')), '2019-10-01').outputs.instrumentationKey.value))), parameters('funcAppSettings'))]"
                 },
                 "httpsOnly": true,
                 "clientAffinityEnabled": false
@@ -322,10 +410,11 @@
               "condition": "[variables('createSourceControl')]",
               "type": "Microsoft.Web/sites/sourcecontrols",
               "apiVersion": "2020-06-01",
-              "name": "[format('{0}/funcAppSourceControl', parameters('name'))]",
+              "name": "[format('{0}/web', parameters('name'))]",
               "properties": {
                 "branch": "[parameters('funcDeployBranch')]",
-                "repoUrl": "[parameters('funcDeployRepoUrl')]"
+                "repoUrl": "[parameters('funcDeployRepoUrl')]",
+                "isManualIntegration": true
               },
               "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', parameters('name'))]"
@@ -555,7 +644,15 @@
               "type": "string",
               "value": "[resourceId('Microsoft.Web/serverfarms', variables('funcAppServicePlanName'))]"
             },
-            "appIns": {
+            "identity": {
+              "type": "object",
+              "value": {
+                "tenantId": "[reference(resourceId('Microsoft.Web/sites', parameters('name')), '2020-06-01', 'full').identity.tenantId]",
+                "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('name')), '2020-06-01', 'full').identity.principalId]",
+                "type": "[reference(resourceId('Microsoft.Web/sites', parameters('name')), '2020-06-01', 'full').identity.type]"
+              }
+            },
+            "applicationInsights": {
               "type": "object",
               "value": "[reference(resourceId('Microsoft.Resources/deployments', variables('funcAppInsName')), '2019-10-01').outputs]"
             },
@@ -565,10 +662,7 @@
             }
           }
         }
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Resources/deployments', 'dataStorage')]"
-      ]
+      }
     }
   ],
   "outputs": {
@@ -579,13 +673,20 @@
     "dataStorage": {
       "type": "object",
       "value": "[reference(resourceId('Microsoft.Resources/deployments', 'dataStorage'), '2019-10-01').outputs]"
+    },
+    "keyVault": {
+      "type": "object",
+      "value": {
+        "id": "[resourceId('Microsoft.KeyVault/vaults', variables('resourceNames').keyVault)]",
+        "name": "[variables('resourceNames').keyVault]"
+      }
     }
   },
   "metadata": {
     "_generator": {
       "name": "bicep",
       "version": "0.3.1.62928",
-      "templateHash": "4202038598496790597"
+      "templateHash": "1954475868236739520"
     }
   }
 }
