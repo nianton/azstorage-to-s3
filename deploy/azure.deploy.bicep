@@ -25,8 +25,8 @@ var resourceNames = {
   dataStorage: 's${toLower(replace(resourcePrefix, '-', ''))}data'
 }
 var secretNames = {
-  awsSecretKey: 'awsSecretKey'
   awsAccessKey: 'awsAccessKey'
+  awsSecretKey: 'awsSecretKey'  
   dataStorageConnectionString: '${resourceNames.dataStorage}ConnectionString'
 }
 

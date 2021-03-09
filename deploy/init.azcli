@@ -2,19 +2,16 @@ resourceGroupName="rg-demo-ui"
 
 az group create --name $resourceGroupName --location francecentral
 
+awsSecretKey=1234567
+awsAccessKey=1234567
+awsBucket=mydevdata
+project=blobtos3
+
 az deployment sub create `
     --template-file azure.sub.deploy.json `
     --location francecentral `
-    --parameters awsSecretKey=123 awsAccessKey=123 awsBucket=mydevdata project=blobtos3
+    --parameters awsSecretKey=$awsSecretKey awsAccessKey=$awsAccessKey awsBucket=$awsBucket project=$project
 
-<<<<<<< HEAD
-=======
-az deployment sub create `
-    --template-file azure.sub.deploy.json`
-    --location westeurope `
-    --parameters resourceGroupName=blobtos3-rg awsSecretKey=123 awsAccessKey=123 awsBucket=mydevdata project=blobtos3
-
->>>>>>> c14da0f (Minor fix)
 # az webapp config appsetting set 
 #     --name dev-niant-func \
 #     --resource-group $resourceGroupName \
