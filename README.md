@@ -17,7 +17,7 @@ The architecture of the solution is as depicted on the following diagram:
 * **Application Insights** to provide monitoring and visibility for the health and performance of the application
 * **Data Storage Account** the Storage Account that will contain the application data / blob files
 
-**Note:** The services / application generating the data 
+**Note:** The external services / application (greyed out on the diagram using Data Factory as an example) generating the data in the Storage Account are not included.
 
 As an example, below are the resources created when running the deployment with project: *'blobtos3'* and environment: *'dev'*
 
