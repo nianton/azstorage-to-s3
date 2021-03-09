@@ -1,9 +1,17 @@
 param location string = resourceGroup().location
-param project string = 'aztransfer'
+param project string = 'blob2s3'
 param environment string = 'dev'
+
+@description('Container name to periodically transfer')
 param scheduledContainerName string = 'scheduled'
+
+@description('Container to move the files from the scheduled run')
 param archiveContainerName string = 'archive'
+
+@description('Container name to monitor for file additions')
 param liveContainerName string = 'live'
+
+@description('Azure Key Vault SKU')
 param keyVaultSku string = 'Standard'
 
 @description('AWS S3 bucket name')

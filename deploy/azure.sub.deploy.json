@@ -111,7 +111,7 @@
             },
             "project": {
               "type": "string",
-              "defaultValue": "aztransfer"
+              "defaultValue": "blob2s3"
             },
             "environment": {
               "type": "string",
@@ -119,19 +119,31 @@
             },
             "scheduledContainerName": {
               "type": "string",
-              "defaultValue": "scheduled"
+              "defaultValue": "scheduled",
+              "metadata": {
+                "description": "Container name to periodically transfer"
+              }
             },
             "archiveContainerName": {
               "type": "string",
-              "defaultValue": "archive"
+              "defaultValue": "archive",
+              "metadata": {
+                "description": "Container to move the files from the scheduled run"
+              }
             },
             "liveContainerName": {
               "type": "string",
-              "defaultValue": "live"
+              "defaultValue": "live",
+              "metadata": {
+                "description": "Container name to monitor for file additions"
+              }
             },
             "keyVaultSku": {
               "type": "string",
-              "defaultValue": "Standard"
+              "defaultValue": "Standard",
+              "metadata": {
+                "description": "Azure Key Vault SKU"
+              }
             },
             "awsBucket": {
               "type": "string",
@@ -161,8 +173,8 @@
               "dataStorage": "[format('s{0}data', toLower(replace(variables('resourcePrefix'), '-', '')))]"
             },
             "secretNames": {
-              "awsSecretKey": "awsSecretKey",
               "awsAccessKey": "awsAccessKey",
+              "awsSecretKey": "awsSecretKey",
               "dataStorageConnectionString": "[format('{0}ConnectionString', variables('resourceNames').dataStorage)]"
             },
             "defaultTags": {
@@ -796,7 +808,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.3.1.62928",
-      "templateHash": "14693580050121766772"
+      "templateHash": "2434236758508231010"
     }
   }
 }
