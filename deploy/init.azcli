@@ -7,6 +7,14 @@ az deployment sub create `
     --location francecentral `
     --parameters awsSecretKey=123 awsAccessKey=123 awsBucket=mydevdata project=blobtos3
 
+<<<<<<< HEAD
+=======
+az deployment sub create `
+    --template-file azure.sub.deploy.json`
+    --location westeurope `
+    --parameters resourceGroupName=blobtos3-rg awsSecretKey=123 awsAccessKey=123 awsBucket=mydevdata project=blobtos3
+
+>>>>>>> c14da0f (Minor fix)
 # az webapp config appsetting set 
 #     --name dev-niant-func \
 #     --resource-group $resourceGroupName \
