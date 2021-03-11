@@ -1,7 +1,10 @@
 using Amazon.S3;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Storage;
 using Microsoft.Azure.Storage.Blob;
 using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -33,6 +36,9 @@ namespace AzStorageTransfer.FuncApp
             this.archiveBlobContainer = this.cloudBlobClient.GetContainerReference(Config.ArchiveContainer);
         }
 
+        /// <summary>
+        /// Scheduled copy of files from Az blob container 'scheduled' to S3 and then moved to an archive container.
+        /// </summary>
         [FunctionName(nameof(ScheduledTransfer))]
         public async Task Run([TimerTrigger(CronSchedule, RunOnStartup = true)] TimerInfo myTimer, ILogger log)
         {
@@ -43,6 +49,25 @@ namespace AzStorageTransfer.FuncApp
             {
                 await TrasferAndArchiveBlobAsync(item, log);
             }
+        }
+
+        /// <summary>
+        /// Exposes the same functionality described in the ScheduledTranfer but via an HttpTrigger.
+        /// Used to integrate with Data Factory if needed.
+        /// </summary>
+        [FunctionName("TransferFiles")]
+        public async Task<IActionResult> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "tranferfiles")] HttpRequest req,
+            ILogger log)
+        {
+            log.LogInformation("C# HTTP trigger function processed a request.");
+            var blobItems = scheduledBlobContainer.ListBlobs(useFlatBlobListing: true);
+            foreach (CloudBlockBlob item in blobItems)
+            {
+                await TrasferAndArchiveBlobAsync(item, log);
+            }
+
+            return new OkResult();
         }
 
         private async Task TrasferAndArchiveBlobAsync(CloudBlockBlob cloudBlob, ILogger log)

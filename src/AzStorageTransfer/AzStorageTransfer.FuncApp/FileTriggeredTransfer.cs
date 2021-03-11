@@ -28,8 +28,11 @@ namespace AzStorageTransfer.FuncApp
 
             using (var ms = new MemoryStream())
             {
-                await myBlob.DownloadToStreamAsync(ms);
+                // Download blob content to stream
+                await myBlob.DownloadToStreamAsync(ms);                
                 ms.Seek(0, SeekOrigin.Begin);
+                
+                // Upload stream to S3
                 await this.amazonS3.UploadObjectFromStreamAsync(Config.Aws.BucketName, name, ms, new Dictionary<string, object>());
             }
         }

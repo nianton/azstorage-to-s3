@@ -138,12 +138,43 @@
                 "description": "Container name to monitor for file additions"
               }
             },
+            "functionAppRepoUrl": {
+              "type": "string",
+              "defaultValue": "https://github.com/nianton/azstorage-to-s3",
+              "metadata": {
+                "description": "The function application repository to be deployed -change if forked"
+              }
+            },
+            "functionAppRepoBranch": {
+              "type": "string",
+              "defaultValue": "main",
+              "metadata": {
+                "description": "The function application repository branch to be deployed"
+              }
+            },
             "keyVaultSku": {
               "type": "string",
-              "defaultValue": "Standard",
+              "defaultValue": "standard",
               "metadata": {
                 "description": "Azure Key Vault SKU"
-              }
+              },
+              "allowedValues": [
+                "standard",
+                "premium"
+              ]
+            },
+            "azureFunctionPlanSkuName": {
+              "type": "string",
+              "defaultValue": "Y1",
+              "metadata": {
+                "description": "Azure Function plan, Y1: Consumption, EPx: Elastic Premium"
+              },
+              "allowedValues": [
+                "Y1",
+                "EP1",
+                "EP2",
+                "EP3"
+              ]
             },
             "awsBucket": {
               "type": "string",
@@ -154,13 +185,13 @@
             "awsAccessKey": {
               "type": "secureString",
               "metadata": {
-                "description": "AWS AccessKey"
+                "description": "AWS AccessKey - value will be stored in the Key Vault"
               }
             },
             "awsSecretKey": {
               "type": "secureString",
               "metadata": {
-                "description": "AWS SecretKey"
+                "description": "AWS SecretKey - value will be stored in the Key Vault"
               }
             }
           },
@@ -367,11 +398,14 @@
                   "tags": {
                     "value": "[variables('defaultTags')]"
                   },
+                  "skuName": {
+                    "value": "[parameters('azureFunctionPlanSkuName')]"
+                  },
                   "funcDeployBranch": {
-                    "value": "main"
+                    "value": "[parameters('functionAppRepoBranch')]"
                   },
                   "funcDeployRepoUrl": {
-                    "value": "https://github.com/nianton/azstorage-to-s3"
+                    "value": "[parameters('functionAppRepoUrl')]"
                   },
                   "funcAppSettings": {
                     "value": [
@@ -808,7 +842,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.3.1.62928",
-      "templateHash": "2434236758508231010"
+      "templateHash": "7510700378708722771"
     }
   }
 }

@@ -10,8 +10,8 @@ The architecture of the solution is as depicted on the following diagram:
 
 ## The role of each component
 * **Azure Function** -responsible to manage the file tranfer with two approaches:
-    * **BlobTrigger**: whenever a file is added on the referenced container (named 'scheduled' by default), it causes the execution of the function to tranfer it to an AWS S3 bucket
-    * **TimeTrigger**: runs in predefined time intervals tranfers all files from Azure Storage container (named 'live' by default) towards AWS S3 bucket, which are then moved to an archive container (named 'archive'😊)
+    * **BlobTrigger**: whenever a file is added on the referenced container (named 'live' by default), it causes the execution of the function to tranfer it to an AWS S3 bucket
+    * **TimeTrigger**: runs in predefined time intervals tranfers all files from Azure Storage container (named 'scheduled' by default) towards AWS S3 bucket, which are then moved to an archive container (named 'archive'😊)
 * **Azure Key Vault** responsible to securely store the secrets/credentials for AWS S3 and Az Data Storage Account
 * **Application Insights** to provide monitoring and visibility for the health and performance of the application
 * **Data Storage Account** the Storage Account that will contain the application data / blob files

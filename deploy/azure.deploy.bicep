@@ -11,25 +11,44 @@ param archiveContainerName string = 'archive'
 @description('Container name to monitor for file additions')
 param liveContainerName string = 'live'
 
+@description('The function application repository to be deployed -change if forked')
+param functionAppRepoUrl string = 'https://github.com/nianton/azstorage-to-s3'
+
+@description('The function application repository branch to be deployed')
+param functionAppRepoBranch string = 'main'
+
+@allowed([
+  'standard'
+  'premium'
+])
 @description('Azure Key Vault SKU')
-param keyVaultSku string = 'Standard'
+param keyVaultSku string = 'standard'
+
+@allowed([
+  'Y1'
+  'EP1'
+  'EP2'
+  'EP3'
+])
+@description('Azure Function plan, Y1: Consumption, EPx: Elastic Premium')
+param azureFunctionPlanSkuName string = 'Y1'
 
 @description('AWS S3 bucket name')
 param awsBucket string
 
 @secure()
-@description('AWS AccessKey')
+@description('AWS AccessKey - value will be stored in the Key Vault')
 param awsAccessKey string
 
 @secure()
-@description('AWS SecretKey')
+@description('AWS SecretKey - value will be stored in the Key Vault')
 param awsSecretKey string
 
 // Resource names - establish naming convention
 var resourcePrefix = '${project}-${environment}'
 var resourceNames = {
   funcApp: '${resourcePrefix}-func'
-  keyVault: '${resourcePrefix}-kv'
+  keyVault: '${resourcePrefix}-kv'  
   dataStorage: 's${toLower(replace(resourcePrefix, '-', ''))}data'
 }
 var secretNames = {
@@ -124,9 +143,10 @@ module funcApp './modules/functionApp.module.bicep' = {
     location: location
     name: resourceNames.funcApp
     managedIdentity: true
-    tags: defaultTags    
-    funcDeployBranch: 'main'
-    funcDeployRepoUrl: 'https://github.com/nianton/azstorage-to-s3'
+    tags: defaultTags
+    skuName: azureFunctionPlanSkuName
+    funcDeployBranch: functionAppRepoBranch
+    funcDeployRepoUrl: functionAppRepoUrl
     funcAppSettings: [
       {
         name: 'DataStorageConnection'

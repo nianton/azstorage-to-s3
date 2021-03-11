@@ -43,7 +43,8 @@ namespace AzStorageTransfer.FuncApp
             }
             catch (Exception ex)
             {
-                return new OkObjectResult(new { error = ex.ToString() });
+                log.LogError(ex, ex.ToString());                
+                return new StatusCodeResult(StatusCodes.Status500InternalServerError);
             }
         }
     }
