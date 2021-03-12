@@ -55,8 +55,8 @@ namespace AzStorageTransfer.FuncApp
         /// Exposes the same functionality described in the ScheduledTranfer but via an HttpTrigger.
         /// Used to integrate with Data Factory if needed.
         /// </summary>
-        [FunctionName("TransferFiles")]
-        public async Task<IActionResult> Run(
+        [FunctionName(nameof(TransferFiles))]
+        public async Task<IActionResult> TransferFiles(
             [HttpTrigger(AuthorizationLevel.Function, "post", Route = "tranferfiles")] HttpRequest req,
             ILogger log)
         {

@@ -21,7 +21,7 @@ namespace AzStorageTransfer.FuncApp
         }
 
         [FunctionName(nameof(ListSourceFiles))]
-        public async Task<IActionResult> Run(
+        public IActionResult Run(
             [HttpTrigger(AuthorizationLevel.Function, "get", Route = "sourcefiles")]
             HttpRequest req,
             ILogger log)
