@@ -13,7 +13,7 @@ namespace AzStorageTransfer.FuncApp
         public static class Aws
         {
             public static string AccessKey { get; } = Environment.GetEnvironmentVariable("AwsAccessKey");
-            public static string SecretKey { get; } = Environment.GetEnvironmentVariable("AwsSecretKey");            
+            public static string SecretKey { get; } = Environment.GetEnvironmentVariable("AwsSecretKey");
             public static string BucketName { get; } = Environment.GetEnvironmentVariable("AwsBucketName");
             public static RegionEndpoint Region { get; } = RegionEndpoint.GetBySystemName(Environment.GetEnvironmentVariable("AwsRegion") ?? RegionEndpoint.EUCentral1.SystemName);
         }

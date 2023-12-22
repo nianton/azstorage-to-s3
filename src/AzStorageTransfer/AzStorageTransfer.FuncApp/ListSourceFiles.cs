@@ -7,7 +7,6 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace AzStorageTransfer.FuncApp
 {

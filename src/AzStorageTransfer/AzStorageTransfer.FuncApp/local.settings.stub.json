@@ -8,9 +8,9 @@
     "LiveContainer": "livedata",
     "ArchiveContainer": "archive",
     "ScheduledContainer": "scheduled",
-    "AwsAccessKey": "ACCESS_KEY",
-    "AwsSecretKey": "SECRET_KEY",
-    "AwsBucketName": "BUCKET_NAME",
+    "AwsAccessKey": "REPLACE_ACCESS_KEY",
+    "AwsSecretKey": "REPLACE_SECRET_KEY",
+    "AwsBucketName": "REPLACE_BUCKET_NAME",
     "AwsRegion": "eu-central-1"
   }
 }

@@ -9,14 +9,13 @@ using System.Linq;
 
 namespace AzStorageTransfer.FuncApp
 {
-
     public class Startup : FunctionsStartup
     {
         public override void Configure(IFunctionsHostBuilder builder)
         {
             builder.Services.AddSingleton<IAmazonS3>(AmazonS3ClientCreate);
         }
-
+        
         private static IAmazonS3 AmazonS3ClientCreate(IServiceProvider serviceProvider)
         {
             var validationErrors = ValidateAwsConfig().ToList();
