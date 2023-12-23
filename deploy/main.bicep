@@ -1,6 +1,4 @@
 param location string = resourceGroup().location
-param project string = 'blob2s3'
-param environment string = 'dev'
 
 @description('Container name to periodically transfer')
 param scheduledContainerName string = 'scheduled'
@@ -16,6 +14,11 @@ param functionAppRepoUrl string = 'https://github.com/nianton/azstorage-to-s3'
 
 @description('The function application repository branch to be deployed')
 param functionAppRepoBranch string = 'main'
+
+@description('Naming module names output')
+param naming object
+
+param defaultTags object = {}
 
 @allowed([
   'standard'
@@ -44,23 +47,17 @@ param awsAccessKey string
 @description('AWS SecretKey - value will be stored in the Key Vault')
 param awsSecretKey string
 
-// Resource names - establish naming convention
-var resourcePrefix = '${project}-${environment}'
 var resourceNames = {
-  funcApp: '${resourcePrefix}-func'
-  keyVault: '${resourcePrefix}-kv'  
-  dataStorage: 's${toLower(replace(resourcePrefix, '-', ''))}data'
+  funcApp: naming.functionApp.nameUnique
+  keyVault: naming.keyVault.nameUnique
+  dataStorage: naming.storageAccount.nameUnique
+  userAssignedIdentity: 'uai-${naming.functionApp.name}'
 }
+
 var secretNames = {
   awsAccessKey: 'awsAccessKey'
   awsSecretKey: 'awsSecretKey'  
-  dataStorageConnectionString: '${resourceNames.dataStorage}ConnectionString'
-}
-
-// Default tags to be added to all resources
-var defaultTags = {
-  environment: environment
-  project: project
+  dataStorageConnectionString: 'dataStorageConnectionString'
 }
 
 // Containers for data storage account
@@ -71,12 +68,14 @@ var containerNames = [
 ]
 
 // Storage Account containing the data
-module dataStorage './modules/storage.module.bicep' = {
+module dataStorage './modules/storageAccount.module.bicep' = {
   name: 'dataStorage'
   params: {
     name: resourceNames.dataStorage
     location: location
     tags: defaultTags
+    keyVaultName: keyVault.outputs.name
+    keyVaultSecretName: secretNames.dataStorageConnectionString
   }
 }
 
@@ -88,20 +87,23 @@ resource containers 'Microsoft.Storage/storageAccounts/blobServices/containers@2
   ]
 }]
 
-// KeyVault for storing the secret
-resource keyVault 'Microsoft.KeyVault/vaults@2019-09-01' = {
-  name: resourceNames.keyVault
+resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2018-11-30' = {
+  name: resourceNames.userAssignedIdentity
   location: location
-  properties: {
-    tenantId: subscription().tenantId
-    sku: {
-      family: 'A'
-      name: keyVaultSku
-    }
+}
+
+module keyVault 'modules/keyvault.module.bicep' =  {
+  name: 'deployment-${resourceNames.keyVault}'
+  params: {
+    name: resourceNames.keyVault
+    location: location
+    tags: defaultTags
+    skuName: keyVaultSku
+    enabledForTemplateDeployment: true
     accessPolicies: [
       {
-        tenantId: funcApp.outputs.identity.tenantId
-        objectId: funcApp.outputs.identity.principalId
+        tenantId: userAssignedIdentity.properties.tenantId
+        objectId: userAssignedIdentity.properties.principalId
         permissions: {
           secrets: [
             'get'
@@ -109,56 +111,44 @@ resource keyVault 'Microsoft.KeyVault/vaults@2019-09-01' = {
         }
       }
     ]
-  }
-  tags: defaultTags
-}
-
-// KeyVault secrets provisioning
-resource keyVaultSecretDataStorage 'Microsoft.KeyVault/vaults/secrets@2018-02-14' = {
-  name: '${keyVault.name}/${secretNames.dataStorageConnectionString}'
-  properties: {
-    value: dataStorage.outputs.connectionString
-  }
-}
-
-resource keyVaultSecretAwsAccessKey 'Microsoft.KeyVault/vaults/secrets@2018-02-14' = {
-  name: '${keyVault.name}/${secretNames.awsAccessKey}'
-  properties: {
-    value: awsAccessKey
-  }
-}
-
-resource keyVaultSecretAwsSecretKey 'Microsoft.KeyVault/vaults/secrets@2018-02-14' = {
-  name: '${keyVault.name}/${secretNames.awsSecretKey}'
-  properties: {
-    value: awsSecretKey
+    secrets: [
+      {
+        name: secretNames.awsAccessKey
+        value: awsAccessKey
+      }
+      {
+        name: secretNames.awsSecretKey
+        value: awsSecretKey
+      }
+    ]
   }
 }
 
 // Function Application (with respected Application Insights and Storage Account)
 // with the respective configuration, and deployment of the application
-module funcApp './modules/functionApp.module.bicep' = {
+module funcAppComposite './modules/functionAppComposite.module.bicep' = {
   name: 'funcApp'
   params: {
     location: location
     name: resourceNames.funcApp
-    managedIdentity: true
+    userAssignedIdentityId: userAssignedIdentity.id
     tags: defaultTags
     skuName: azureFunctionPlanSkuName
-    funcDeployBranch: functionAppRepoBranch
+    keyVaultName: keyVault.outputs.name
     funcDeployRepoUrl: functionAppRepoUrl
+    funcDeployBranch: functionAppRepoBranch
     funcAppSettings: [
       {
         name: 'DataStorageConnection'
-        value: '@Microsoft.KeyVault(VaultName=${resourceNames.keyVault};SecretName=${secretNames.dataStorageConnectionString})'
+        value: dataStorage.outputs.keyVaultSecretReference
       }
       {
         name: 'AwsAccessKey'
-        value: '@Microsoft.KeyVault(VaultName=${resourceNames.keyVault};SecretName=${secretNames.awsAccessKey})'
+        value: keyVault.outputs.secrets[0].reference
       }
       {
         name: 'AwsSecretKey'
-        value: '@Microsoft.KeyVault(VaultName=${resourceNames.keyVault};SecretName=${secretNames.awsSecretKey})'
+        value: keyVault.outputs.secrets[1].reference
       }
       {
         name: 'AwsBucketName'
@@ -180,9 +170,6 @@ module funcApp './modules/functionApp.module.bicep' = {
   }
 }
 
-output funcDeployment object = funcApp
+// output funcDeployment object = funcAppComposite
 output dataStorage object = dataStorage
-output keyVault object = {
-  id: keyVault.id
-  name: keyVault.name
-}
+output keyVault object = keyVault

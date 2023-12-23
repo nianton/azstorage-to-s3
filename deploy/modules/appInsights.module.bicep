@@ -1,16 +1,18 @@
-param name string = 'nianton'
-param project string
+param name string
+param projectName string
 param location string
+param logAnalyticsWorkspaceId string = ''
 param tags object = {}
 
-var workspaceName = '${name}-lawp'
+var deployWorkspace = empty(logAnalyticsWorkspaceId)
+var workspaceName = 'log-${name}'
 
-resource laWorkspace 'Microsoft.OperationalInsights/workspaces@2020-08-01' = {
+resource laWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = if (deployWorkspace) {
   location: location
   name: workspaceName
   tags: union(tags, {
     displayName: workspaceName
-    projectName: project
+    projectName: projectName
   })
   properties: {
     retentionInDays: 90
@@ -20,7 +22,7 @@ resource laWorkspace 'Microsoft.OperationalInsights/workspaces@2020-08-01' = {
   }
 }
 
-resource appIns 'Microsoft.Insights/components@2020-02-02-preview' = {
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   name: name
   location: location
   kind: 'web'
@@ -28,10 +30,10 @@ resource appIns 'Microsoft.Insights/components@2020-02-02-preview' = {
   properties: {
     Application_Type: 'web'
     Request_Source: 'rest'
-    WorkspaceResourceId: laWorkspace.id
+    WorkspaceResourceId: deployWorkspace ? laWorkspace.id : logAnalyticsWorkspaceId
   }
 }
 
-output id string = appIns.id
-output instrumentationKey string = appIns.properties.InstrumentationKey
-output workspaceId string = laWorkspace.id
+output id string = appInsights.id
+output instrumentationKey string = appInsights.properties.InstrumentationKey
+output logAnalyticsWorkspaceId string = deployWorkspace ? laWorkspace.id : logAnalyticsWorkspaceId

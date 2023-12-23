@@ -1,10 +1,30 @@
 param name string
 param location string = resourceGroup().location
 param tags object = {}
+
+@allowed([
+  'java'
+  'dotnet'
+  'node'
+  'python'
+  'powershell'
+])
 param funcWorkerRuntime string = 'dotnet'
-param funcExtensionVersion string = '~3'
+param funcExtensionVersion string = '~4'
+param funcNetFrameworkVersion string = 'v6.0'
 param funcAppSettings array = []
-param managedIdentity bool = false
+
+#disable-next-line secure-secrets-in-params // Contains the key vault reference for the storage account's connection string 
+param funcStorageKeyVaultSecretReference string
+param funcStorageName string
+
+@description('Optional. Whether to create a managed identity for the web app -defaults to \'false\'')
+param systemAssignedIdentity bool = false
+
+param userAssignedIdentityId string = ''
+
+@description('Optional. Whether to create a linux OS based web app -defaults to \'false\'')
+param linux bool = false
 
 @allowed([
   'Y1'
@@ -14,38 +34,51 @@ param managedIdentity bool = false
 ])
 param skuName string = 'Y1'
 
+@description('Optional. The container to be deployed -fully qualified container tag expected.')
+param containerApplicationTag string = ''
+
 param funcDeployRepoUrl string = ''
 param funcDeployBranch string = ''
 param subnetIdForIntegration string = ''
-param includeSampleFunction bool = false
+param appInsInstrumentationKey string = ''
 
 var skuTier = skuName == 'Y1' ? 'Dynamic' : 'Elastic'
-var funcAppServicePlanName = '${name}-asp'
-var funcStorageName = 's${replace(name, '-', '')}'
-var funcAppInsName = '${name}-appins'
+var funcAppServicePlanName = 'plan-${name}'
+
+var funcAppInsName = 'appins-${name}'
 var createSourceControl = !empty(funcDeployRepoUrl)
 var createNetworkConfig = !empty(subnetIdForIntegration)
+var createAppInsights = empty(appInsInstrumentationKey)
 
-module funcStorage './storage.module.bicep' = {
-  name: funcStorageName
-  params: {
-    name: funcStorageName
-    location: location
-    tags: tags
+var identityType = systemAssignedIdentity ? (!empty(userAssignedIdentityId) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned') : (!empty(userAssignedIdentityId) ? 'UserAssigned' : 'None')
+var identity = identityType != 'None' ? {
+  type: identityType
+  userAssignedIdentities: empty(userAssignedIdentityId) ? null : {
+    '${userAssignedIdentityId}': {}
   }
-}
+} : null
 
-module funcAppIns './appInsights.module.bicep' = {
-  name: funcAppInsName
+var linuxFxVersion = linux ? (empty(containerApplicationTag) ? 'DOCKER|mcr.microsoft.com/azure-functions/dotnet:4' : 'DOCKER|${containerApplicationTag}') : null
+
+var siteConfigPartNetFrameworkVersion = funcWorkerRuntime == 'dotnet' ? {
+  netFrameworkVersion: funcNetFrameworkVersion
+} : {}
+
+var siteConfigPartLinuxFxVersion = linux ? {
+  linuxFxVersion: linuxFxVersion
+} : {}
+
+module funcAppIns './appInsights.module.bicep' = if (createAppInsights) {
+  name: 'AppInsights-${funcAppInsName}-Deployment'
   params: {
     name: funcAppInsName
     location: location
+    projectName: name
     tags: tags
-    project: name
   }
 }
 
-resource funcAppServicePlan 'Microsoft.Web/serverfarms@2020-06-01' = {
+resource funcAppServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   name: funcAppServicePlanName
   location: location
   tags: tags
@@ -53,26 +86,30 @@ resource funcAppServicePlan 'Microsoft.Web/serverfarms@2020-06-01' = {
     name: skuName
     tier: skuTier
   }
+  kind: linux ? 'linux,functionapp' : 'functionapp'
+  properties: {
+    reserved: linux
+  }
 }
 
-resource funcApp 'Microsoft.Web/sites@2020-06-01' = {
+resource funcStorage 'Microsoft.Storage/storageAccounts@2019-06-01' existing = {
+  name: funcStorageName
+}
+
+resource funcApp 'Microsoft.Web/sites@2022-09-01' = {
   name: name
   location: location
-  kind: 'functionapp'
-  identity: {
-    type: managedIdentity ? 'SystemAssigned' : 'None'
-  }
+  kind: linux ? 'functionapp,linux' : 'functionapp'
+  identity: identity
   properties: {
-    serverFarmId: funcAppServicePlan.id
-    siteConfig: {
+    serverFarmId: funcAppServicePlan.id    
+    keyVaultReferenceIdentity: !empty(userAssignedIdentityId) ? userAssignedIdentityId : null
+    siteConfig: union({
+      ftpsState: 'Disabled'
       appSettings: concat([
         {
           name: 'FUNCTIONS_EXTENSION_VERSION'
           value: funcExtensionVersion
-        }
-        {
-          name: 'WEBSITE_NODE_DEFAULT_VERSION'
-          value: '10.14.1'
         }
         {
           name: 'FUNCTIONS_WORKER_RUNTIME'
@@ -80,15 +117,15 @@ resource funcApp 'Microsoft.Web/sites@2020-06-01' = {
         }
         {
           name: 'AzureWebJobsDashboard'
-          value: funcStorage.outputs.connectionString
+          value: funcStorageKeyVaultSecretReference
         }
         {
           name: 'AzureWebJobsStorage'
-          value: funcStorage.outputs.connectionString
+          value: funcStorageKeyVaultSecretReference 
         }
         {
           name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
-          value: funcStorage.outputs.connectionString
+          value: 'DefaultEndpointsProtocol=https;AccountName=${funcStorage.name};AccountKey=${funcStorage.listKeys().keys[0].value}' //
         }
         {
           name: 'WEBSITE_CONTENTSHARE'
@@ -96,29 +133,35 @@ resource funcApp 'Microsoft.Web/sites@2020-06-01' = {
         }
         {
           name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
-          value: funcAppIns.outputs.instrumentationKey
+          value: createAppInsights ? funcAppIns.outputs.instrumentationKey : appInsInstrumentationKey
         }
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-          value: 'InstrumentationKey=${funcAppIns.outputs.instrumentationKey}'
+          value: 'InstrumentationKey=${createAppInsights ? funcAppIns.outputs.instrumentationKey : appInsInstrumentationKey}'
         }
-      ], funcAppSettings)
-    }
+      ], funcAppSettings)      
+    }, 
+    siteConfigPartLinuxFxVersion, 
+    siteConfigPartNetFrameworkVersion)
     httpsOnly: true
     clientAffinityEnabled: false
   }
-  tags: tags
+  tags: union(tags, {
+    'hidden-related:${resourceGroup().id}/providers/Microsoft.Web/serverfarms/${funcAppServicePlan.name}': 'Resource'
+  }, createAppInsights ? {'hidden-link: /app-insights-resource-id': resourceId('Microsoft.Insights/components', funcAppInsName)} : {})
 }
 
-resource networkConfig 'Microsoft.Web/sites/networkConfig@2020-06-01' = if (createNetworkConfig) {
-  name: '${funcApp.name}/VirtualNetwork'
+resource networkConfig 'Microsoft.Web/sites/networkConfig@2022-09-01' = if (createNetworkConfig) {
+  parent: funcApp
+  name: 'virtualNetwork'
   properties: {
     subnetResourceId: subnetIdForIntegration
   }
 }
 
-resource funcAppSourceControl 'Microsoft.Web/sites/sourcecontrols@2020-06-01' = if (createSourceControl) {
-  name: '${funcApp.name}/web'
+resource funcAppSourceControl 'Microsoft.Web/sites/sourcecontrols@2022-09-01' = if (createSourceControl) {
+  parent: funcApp
+  name: 'web'
   properties: {
     branch: funcDeployBranch
     repoUrl: funcDeployRepoUrl
@@ -126,41 +169,13 @@ resource funcAppSourceControl 'Microsoft.Web/sites/sourcecontrols@2020-06-01' = 
   }
 }
 
-resource sampleFunction 'Microsoft.Web/sites/functions@2020-06-01' = if (includeSampleFunction) {
-  name: '${funcApp.name}/sampleFunction'
-  properties: {
-    config: {
-      bindings: [
-        {
-          name: 'req'
-          authLevel: 'anonymous'
-          type: 'httpTrigger'
-          direction: 'in'
-          methods: [
-            'get'
-            'post'
-          ]
-        }
-        {
-          name: '$return'
-          type: 'http'
-          direction: 'out'
-        }
-      ]
-      files:{
-        'run.csx': '#r "Newtonsoft.Json"\n\nusing System.Net;\nusing Microsoft.AspNetCore.Mvc;\nusing Microsoft.Extensions.Primitives;\nusing Newtonsoft.Json;\n\npublic static async Task<IActionResult> Run(HttpRequest req, ILogger log)\n{\n    log.LogInformation("C# HTTP trigger function processed a request.");\n\n    string name = req.Query["name"];\n\n    string requestBody = await new StreamReader(req.Body).ReadToEndAsync();\n    dynamic data = JsonConvert.DeserializeObject(requestBody);\n    name = name ?? data?.name;\n\n    string responseMessage = string.IsNullOrEmpty(name)\n        ? "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response."\n                : $"Hello, {name}. This HTTP triggered function executed successfully.";\n\n            return new OkObjectResult(responseMessage);\n}\n'
-      }  
-    }
-  }
-}
-
 output id string = funcApp.id
 output name string = funcApp.name
 output appServicePlanId string = funcAppServicePlan.id
-output identity object = {
+output systemAssignedIdentity object = systemAssignedIdentity ? {
   tenantId: funcApp.identity.tenantId
   principalId: funcApp.identity.principalId
   type: funcApp.identity.type
-}
+} : {}
 output applicationInsights object = funcAppIns
 output storage object = funcStorage

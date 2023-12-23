@@ -1,18 +1,15 @@
-resourceGroupName="rg-demo-ui"
-
-az group create --name $resourceGroupName --location francecentral
-
-awsSecretKey=1234567
-awsAccessKey=1234567
-awsBucket=mydevdata
+location=francecentral
 project=blobtos3
+environment=test
 
-az deployment sub create `
-    --template-file azure.sub.deploy.json `
-    --location francecentral `
-    --parameters awsSecretKey=$awsSecretKey awsAccessKey=$awsAccessKey awsBucket=$awsBucket project=$project
+# AWS bucket credentials
+awsSecretKey=REPLACE_WITH_AWS_SECRET_KEY
+awsAccessKey=REPLACE_WITH_AWS_ACCESS_KEY
+awsBucket=mydevdata
 
-# az webapp config appsetting set 
-#     --name dev-niant-func \
-#     --resource-group $resourceGroupName \
-#     --settings AZURE_TENANT_ID=$tenantId AZURE_SUBSCRIPTION_ID=$subscriptionId
+# Deploy Azure resources on subscription 
+az deployment sub create \
+    --name "Sub-Deployment-$project-$environment-$location" \
+    --template-file azure.sub.deploy.bicep \
+    --location $location \
+    --parameters awsSecretKey=$awsSecretKey awsAccessKey=$awsAccessKey awsBucket=$awsBucket project=$project environment=$environment
