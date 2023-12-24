@@ -69,7 +69,7 @@ var siteConfigPartLinuxFxVersion = linux ? {
 } : {}
 
 module funcAppIns './appInsights.module.bicep' = if (createAppInsights) {
-  name: 'AppInsights-${funcAppInsName}-Deployment'
+  name: 'AppInsights-${funcAppInsName}'
   params: {
     name: funcAppInsName
     location: location
@@ -172,6 +172,7 @@ resource funcAppSourceControl 'Microsoft.Web/sites/sourcecontrols@2022-09-01' = 
 output id string = funcApp.id
 output name string = funcApp.name
 output appServicePlanId string = funcAppServicePlan.id
+output appServicePlanName string = funcAppServicePlan.name
 output systemAssignedIdentity object = systemAssignedIdentity ? {
   tenantId: funcApp.identity.tenantId
   principalId: funcApp.identity.principalId

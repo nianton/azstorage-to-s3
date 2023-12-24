@@ -5,7 +5,7 @@ param keyVaultName string
 param secrets array
 
 module keyVaultSecrets 'keyvault.secret.module.bicep' = [for secret in secrets: {
-  name: 'KeyVaultSecret-${secret.name}-Deployment'
+  name: 'KeyVaultSecret-${secret.name}'
   params: {
     keyVaultName: keyVaultName
     name: secret.name    

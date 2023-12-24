@@ -33,7 +33,7 @@ var resourceNames = {
 }
 
 module funcStorage './storageAccount.module.bicep' = {
-  name: 'StorageAccount-${resourceNames.funcStorage}-Deployment'
+  name: 'StorageAccount-${resourceNames.funcStorage}'
   params: {
     #disable-next-line BCP334 // erroneous BCP334 warning
     name: resourceNames.funcStorage
@@ -45,7 +45,7 @@ module funcStorage './storageAccount.module.bicep' = {
 }
 
 module functionApp 'functionApp.module.bicep' = {
-  name: 'FunctionApp-${name}-Deployment'
+  name: 'FunctionApp-${name}'
   params: {
     name: name
     location: location

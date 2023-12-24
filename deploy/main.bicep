@@ -47,6 +47,7 @@ param awsAccessKey string
 @description('AWS SecretKey - value will be stored in the Key Vault')
 param awsSecretKey string
 
+// Resource names for the deployment, based on Naming's module output
 var resourceNames = {
   funcApp: naming.functionApp.nameUnique
   keyVault: naming.keyVault.nameUnique
@@ -54,6 +55,7 @@ var resourceNames = {
   userAssignedIdentity: 'uai-${naming.functionApp.name}'
 }
 
+// Secret names in the Key Vault
 var secretNames = {
   awsAccessKey: 'awsAccessKey'
   awsSecretKey: 'awsSecretKey'  
@@ -69,7 +71,7 @@ var containerNames = [
 
 // Storage Account containing the data
 module dataStorage './modules/storageAccount.module.bicep' = {
-  name: 'dataStorage'
+  name: 'StorageAccount-${resourceNames.dataStorage}'
   params: {
     name: resourceNames.dataStorage
     location: location
@@ -93,7 +95,7 @@ resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@
 }
 
 module keyVault 'modules/keyvault.module.bicep' =  {
-  name: 'deployment-${resourceNames.keyVault}'
+  name: 'KeyVault-${resourceNames.keyVault}'
   params: {
     name: resourceNames.keyVault
     location: location
@@ -127,7 +129,7 @@ module keyVault 'modules/keyvault.module.bicep' =  {
 // Function Application (with respected Application Insights and Storage Account)
 // with the respective configuration, and deployment of the application
 module funcAppComposite './modules/functionAppComposite.module.bicep' = {
-  name: 'funcApp'
+  name: 'FunctionAppComposite-${resourceNames.funcApp}'
   params: {
     location: location
     name: resourceNames.funcApp
@@ -170,6 +172,6 @@ module funcAppComposite './modules/functionAppComposite.module.bicep' = {
   }
 }
 
-// output funcDeployment object = funcAppComposite
+output funcDeployment object = funcAppComposite.outputs
 output dataStorage object = dataStorage
 output keyVault object = keyVault

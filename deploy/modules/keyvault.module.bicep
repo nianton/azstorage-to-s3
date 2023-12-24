@@ -33,7 +33,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' = {
 }
 
 module secretsDeployment 'keyvault.secrets.module.bicep' = if (!empty(secrets)) {
-  name: 'KeyVault-${name}-Secrets'
+  name: 'KeyVaultSecrets-${name}'
   params: {
     keyVaultName: keyVault.name
     secrets: secrets

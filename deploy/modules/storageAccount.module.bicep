@@ -54,7 +54,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2019-06-01' = {
 }
 
 module keyVaultSecret 'keyvault.secret.module.bicep' = if (createSecretInKeyVault) {
-  name: 'StorageAccount-KeyVaultSecret-${name}'
+  name: 'StorageAccount-${name}-KeyVaultSecret-${keyVaultSecretName}'
   params: {
     keyVaultName: keyVaultName
     name: keyVaultSecretName
